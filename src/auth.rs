@@ -140,15 +140,52 @@ use axum::{
     http::Request,
     response::Response,
     extract::State,
-    body::Body,
 };
 use std::sync::Arc;
 
 pub async fn basic_auth_middleware(
-    State(_state): State<Arc<wiki_server::AppState>>,
-    req: Request<Body>,
+    State(state): State<Arc<wiki_server::AppState>>,
+    req: Request<axum::body::Body>,
     next: Next,
-) -> Response {
-    // TODO: implement in a later task
-    next.run(req).await
+) -> Result<Response, wiki_server::WikiError> {
+    let auth_header = req.headers()
+        .get("authorization")
+        .and_then(|h| h.to_str().ok());
+
+    if let Some(auth_header) = auth_header {
+        if auth_header.starts_with("Basic ") {
+            if let Ok(credentials) = base64_decode(&auth_header[6..]) {
+                if let Some((username, password)) = credentials.split_once(':') {
+                    let users_file = state.wiki_data_dir.join(".users.json");
+                    if let Ok(Some(user)) = find_user(&users_file, username) {
+                        if let Ok(true) = verify_password(password, &user.password_hash) {
+                            // Store username in request extensions for API handlers
+                            let mut req = req;
+                            req.extensions_mut().insert(CurrentUser {
+                                username: username.to_string(),
+                                is_admin: user.is_admin,
+                            });
+                            return Ok(next.run(req).await);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // No valid auth, return 401
+    Err(wiki_server::WikiError::Unauthorized)
+}
+
+fn base64_decode(s: &str) -> Result<String, anyhow::Error> {
+    let engine = base64::engine::general_purpose::STANDARD;
+    use base64::Engine as _;
+    let decoded = engine.decode(s)?;
+    Ok(String::from_utf8(decoded)?)
+}
+
+#[derive(Debug, Clone)]
+pub struct CurrentUser {
+    pub username: String,
+    pub is_admin: bool,
 }

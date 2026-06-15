@@ -76,6 +76,7 @@ pub async fn get_page(
 pub async fn save_page(
     State(state): State<Arc<AppState>>,
     Path(page_path): Path<String>,
+    axum::extract::Extension(current_user): axum::extract::Extension<crate::auth::CurrentUser>,
     Json(req): Json<SavePageRequest>,
 ) -> Result<Json<SaveResponse>, WikiError> {
     let file_path = pages::path_to_file(&state.wiki_data_dir, &page_path)
@@ -102,7 +103,7 @@ pub async fn save_page(
     }
 
     // No conflict, write and commit
-    pages::write_page(&state.wiki_data_dir, &page_path, &req.content, "unknown")
+    pages::write_page(&state.wiki_data_dir, &page_path, &req.content, &current_user.username)
         .map_err(|e| WikiError::InternalError(e.to_string()))?;
 
     let commit_hash = git::get_current_head(&state.wiki_data_dir)
@@ -110,7 +111,7 @@ pub async fn save_page(
 
     Ok(Json(SaveResponse {
         commit_hash: Some(commit_hash),
-        author: Some("unknown".to_string()),
+        author: Some(current_user.username.clone()),
         message: Some(format!("Update {}", page_path)),
         conflict: Some(false),
         current_content: None,
