@@ -1,12 +1,14 @@
-// Placeholder - to be implemented in Task 6
-use axum::extract::{State, Path, Query};
-use axum::response::{IntoResponse, Html};
-use axum::http::{StatusCode, Request};
-use axum::body::Body;
-use axum::Json;
+use axum::{
+    extract::{State, Path, Query},
+    response::{IntoResponse, Html},
+    http::{StatusCode, Request},
+    body::Body,
+    Json,
+};
 use serde::Deserialize;
 use std::sync::Arc;
 use wiki_server::{AppState, ListPageResponse, PageResponse, SaveResponse, SearchResult, WikiError};
+use crate::{pages, search, git, auth};
 
 #[derive(Deserialize)]
 pub struct SavePageRequest {
@@ -27,40 +29,146 @@ pub struct SearchQuery {
 }
 
 pub async fn list_pages(
-    _state: State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ListPageResponse>>, WikiError> {
-    Err(WikiError::InternalError("not implemented".into()))
+    pages::list_pages(&state.wiki_data_dir)
+        .map(Json)
+        .map_err(|e| WikiError::InternalError(e.to_string()))
 }
 
 pub async fn get_page(
-    _state: State<Arc<AppState>>,
-    _path: Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(page_path): Path<String>,
 ) -> Result<Json<PageResponse>, WikiError> {
-    Err(WikiError::InternalError("not implemented".into()))
+    match pages::read_page(&state.wiki_data_dir, &page_path) {
+        Ok(content) => {
+            let current_head = git::get_current_head(&state.wiki_data_dir)
+                .map_err(|e| WikiError::GitError(e.to_string()))?;
+
+            // Get git history
+            let file_path = pages::path_to_file(&state.wiki_data_dir, &page_path)
+                .map_err(|e| WikiError::InternalError(e.to_string()))?;
+
+            let history_raw = git::get_git_log(&state.wiki_data_dir, &file_path, 10)
+                .unwrap_or_default();
+
+            let history = history_raw
+                .into_iter()
+                .map(|(hash, author, message)| wiki_server::CommitInfo {
+                    commit_hash: hash,
+                    author,
+                    message,
+                    date: chrono::Utc::now(), // TODO: parse from git log
+                })
+                .collect();
+
+            Ok(Json(PageResponse {
+                path: page_path,
+                content,
+                history,
+                current_git_head: current_head,
+            }))
+        }
+        Err(_) => Err(WikiError::NotFound),
+    }
 }
 
 pub async fn save_page(
-    _state: State<Arc<AppState>>,
-    _path: Path<String>,
-    _req: Json<SavePageRequest>,
+    State(state): State<Arc<AppState>>,
+    Path(page_path): Path<String>,
+    Json(req): Json<SavePageRequest>,
 ) -> Result<Json<SaveResponse>, WikiError> {
-    Err(WikiError::InternalError("not implemented".into()))
+    let file_path = pages::path_to_file(&state.wiki_data_dir, &page_path)
+        .map_err(|e| WikiError::InternalError(e.to_string()))?;
+
+    // Check if file changed since expected_git_head
+    let file_changed = git::file_changed_since_head(&state.wiki_data_dir, &file_path, &req.expected_git_head)
+        .map_err(|e| WikiError::GitError(e.to_string()))?;
+
+    if file_changed {
+        // Conflict detected
+        let current_content = pages::read_page(&state.wiki_data_dir, &page_path)
+            .unwrap_or_default();
+
+        return Ok(Json(SaveResponse {
+            conflict: Some(true),
+            current_content: Some(current_content),
+            their_changes: Some(req.content),
+            commit_hash: None,
+            author: None,
+            message: None,
+            base: None,
+        }));
+    }
+
+    // No conflict, write and commit
+    pages::write_page(&state.wiki_data_dir, &page_path, &req.content, "unknown")
+        .map_err(|e| WikiError::InternalError(e.to_string()))?;
+
+    let commit_hash = git::get_current_head(&state.wiki_data_dir)
+        .map_err(|e| WikiError::GitError(e.to_string()))?;
+
+    Ok(Json(SaveResponse {
+        commit_hash: Some(commit_hash),
+        author: Some("unknown".to_string()),
+        message: Some(format!("Update {}", page_path)),
+        conflict: Some(false),
+        current_content: None,
+        their_changes: None,
+        base: None,
+    }))
 }
 
 pub async fn resolve_conflict(
-    _state: State<Arc<AppState>>,
-    _req: Json<ResolveConflictRequest>,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ResolveConflictRequest>,
 ) -> Result<Json<SaveResponse>, WikiError> {
-    Err(WikiError::InternalError("not implemented".into()))
+    pages::write_page(&state.wiki_data_dir, &req.path, &req.resolved_content, "unknown")
+        .map_err(|e| WikiError::InternalError(e.to_string()))?;
+
+    let commit_hash = git::get_current_head(&state.wiki_data_dir)
+        .map_err(|e| WikiError::GitError(e.to_string()))?;
+
+    Ok(Json(SaveResponse {
+        commit_hash: Some(commit_hash),
+        author: Some("unknown".to_string()),
+        message: Some(format!("Resolve conflict in {}", req.path)),
+        conflict: Some(false),
+        current_content: None,
+        their_changes: None,
+        base: None,
+    }))
 }
 
 pub async fn search_pages(
-    _state: State<Arc<AppState>>,
-    _qs: Query<SearchQuery>,
+    State(state): State<Arc<AppState>>,
+    Query(qs): Query<SearchQuery>,
 ) -> Result<Json<Vec<SearchResult>>, WikiError> {
-    Err(WikiError::InternalError("not implemented".into()))
+    search::search(&state.wiki_data_dir, &qs.q)
+        .map(Json)
+        .map_err(|e| WikiError::InternalError(e.to_string()))
 }
 
-pub async fn serve_static(_req: Request<Body>) -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, "Not found")
+pub async fn serve_static(req: Request<Body>) -> impl IntoResponse {
+    match req.uri().path() {
+        "/" | "/index.html" => {
+            match tokio::fs::read_to_string("static/index.html").await {
+                Ok(content) => (StatusCode::OK, Html(content)).into_response(),
+                Err(_) => (StatusCode::NOT_FOUND, "Not found").into_response(),
+            }
+        }
+        path if path.ends_with(".css") => {
+            match tokio::fs::read_to_string(format!("static{}", path)).await {
+                Ok(content) => (StatusCode::OK, [("content-type", "text/css")], content).into_response(),
+                Err(_) => (StatusCode::NOT_FOUND, "Not found").into_response(),
+            }
+        }
+        path if path.ends_with(".js") => {
+            match tokio::fs::read_to_string(format!("static{}", path)).await {
+                Ok(content) => (StatusCode::OK, [("content-type", "application/javascript")], content).into_response(),
+                Err(_) => (StatusCode::NOT_FOUND, "Not found").into_response(),
+            }
+        }
+        _ => (StatusCode::NOT_FOUND, "Not found").into_response(),
+    }
 }
