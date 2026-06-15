@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wiki</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div id="app" class="container">
+        <div class="sidebar">
+            <h2>Wiki</h2>
+            <input type="text" id="search-input" placeholder="Search pages...">
+            <div id="page-list"></div>
+            <button id="new-page-btn">+ New Page</button>
+        </div>
+        <div class="main">
+            <div id="editor" style="display: none;">
+                <div class="editor-header">
+                    <input type="text" id="page-path-input" placeholder="Page path (e.g., docs/guide)">
+                    <button id="save-btn">Save</button>
+                </div>
+                <div class="editor-container">
+                    <textarea id="content-input"></textarea>
+                    <div id="preview" class="preview"></div>
+                </div>
+                <div id="conflict-ui" style="display: none;">
+                    <h3>Merge Conflict</h3>
+                    <div class="conflict-content">
+                        <div class="conflict-side">
+                            <h4>Current (Server)</h4>
+                            <pre id="current-content"></pre>
+                        </div>
+                        <div class="conflict-side">
+                            <h4>Your Changes</h4>
+                            <pre id="their-content"></pre>
+                        </div>
+                    </div>
+                    <textarea id="resolve-input"></textarea>
+                    <button id="resolve-btn">Resolve Conflict</button>
+                </div>
+            </div>
+            <div id="viewer" style="display: none;">
+                <div class="viewer-header">
+                    <h1 id="page-title"></h1>
+                    <button id="edit-btn">Edit</button>
+                </div>
+                <div id="page-content" class="content"></div>
+                <div id="history" class="history">
+                    <h3>History</h3>
+                    <div id="history-list"></div>
+                </div>
+            </div>
+            <div id="welcome" style="display: block;">
+                <h1>Welcome to Wiki</h1>
+                <p>Select a page or create a new one.</p>
+            </div>
+        </div>
+    </div>
+    <script src="/app.js"></script>
+</body>
+</html>
