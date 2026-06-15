@@ -1,0 +1,8 @@
+/target
+/wiki_data
+.DS_Store
+*.swp
+*.swo
+*~
+.idea
+.vscode
