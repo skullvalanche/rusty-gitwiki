@@ -4,7 +4,7 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use wiki_server::{
+use rusty_gitwiki::{
     AppState, PasswordSetRequest, UserAdminResponse, UserCreateRequest, UserCreateResponse,
     UserRoleSetRequest, WikiError,
 };

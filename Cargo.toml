@@ -1,10 +1,10 @@
 [package]
-name = "wiki-server"
+name = "rusty-gitwiki"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "wiki-server"
+name = "rusty-gitwiki"
 path = "src/main.rs"
 
 [dependencies]

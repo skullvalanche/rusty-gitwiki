@@ -1,10 +1,10 @@
 # Contributing
 
-This document captures the architecture and development notes for Wiki Server.
+This document captures the architecture and development notes for Rusty Gitwiki.
 
 ## Architecture
 
-Wiki Server is a small Rust/Axum application with a vanilla JavaScript single-page frontend.
+Rusty Gitwiki is a small Rust/Axum application with a vanilla JavaScript single-page frontend.
 
 - **Backend**: Rust with Axum routes in `src/main.rs`, request handlers in `src/api.rs` and `src/admin.rs`.
 - **Frontend**: Static files in `static/`, served by the Rust app fallback.

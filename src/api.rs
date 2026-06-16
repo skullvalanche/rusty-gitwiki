@@ -7,7 +7,7 @@ use axum::{
 };
 use serde::Deserialize;
 use std::sync::Arc;
-use wiki_server::{AppState, ListPageResponse, PageResponse, SaveResponse, SearchResult, WikiError};
+use rusty_gitwiki::{AppState, ListPageResponse, PageResponse, SaveResponse, SearchResult, WikiError};
 use crate::{pages, search, git, auth};
 use comrak::{markdown_to_html, ComrakOptions};
 
@@ -60,7 +60,7 @@ pub async fn get_page(
 
             let history = history_raw
                 .into_iter()
-                .map(|(hash, author, message)| wiki_server::CommitInfo {
+                .map(|(hash, author, message)| rusty_gitwiki::CommitInfo {
                     commit_hash: hash,
                     author,
                     message,
@@ -211,7 +211,7 @@ pub async fn rename_page(
 pub async fn list_archived_pages(
     State(state): State<Arc<AppState>>,
     axum::extract::Extension(current_user): axum::extract::Extension<crate::auth::CurrentUser>,
-) -> Result<Json<Vec<wiki_server::ArchivedPageResponse>>, WikiError> {
+) -> Result<Json<Vec<rusty_gitwiki::ArchivedPageResponse>>, WikiError> {
     if !current_user.is_admin() {
         return Err(WikiError::Unauthorized);
     }
@@ -384,13 +384,13 @@ pub async fn rebuild_search_index(
 pub async fn get_profile(
     State(state): State<Arc<AppState>>,
     axum::extract::Extension(current_user): axum::extract::Extension<crate::auth::CurrentUser>,
-) -> Result<Json<wiki_server::UserProfileResponse>, WikiError> {
+) -> Result<Json<rusty_gitwiki::UserProfileResponse>, WikiError> {
     let users_file = state.wiki_data_dir.join(".users.json");
     let user = auth::find_user(&users_file, &current_user.username)
         .map_err(|e| WikiError::InternalError(e.to_string()))?
         .ok_or(WikiError::NotFound)?;
 
-    Ok(Json(wiki_server::UserProfileResponse {
+    Ok(Json(rusty_gitwiki::UserProfileResponse {
         username: user.username,
         name: user.name,
         email: user.email,
@@ -403,8 +403,8 @@ pub async fn get_profile(
 pub async fn update_profile(
     State(state): State<Arc<AppState>>,
     axum::extract::Extension(current_user): axum::extract::Extension<crate::auth::CurrentUser>,
-    Json(req): Json<wiki_server::UserProfileUpdateRequest>,
-) -> Result<Json<wiki_server::UserProfileResponse>, WikiError> {
+    Json(req): Json<rusty_gitwiki::UserProfileUpdateRequest>,
+) -> Result<Json<rusty_gitwiki::UserProfileResponse>, WikiError> {
     let users_file = state.wiki_data_dir.join(".users.json");
     let user = auth::update_user_profile(
         &users_file,
@@ -414,7 +414,7 @@ pub async fn update_profile(
         &req.description,
     ).map_err(|e| WikiError::InternalError(e.to_string()))?;
 
-    Ok(Json(wiki_server::UserProfileResponse {
+    Ok(Json(rusty_gitwiki::UserProfileResponse {
         username: user.username,
         name: user.name,
         email: user.email,

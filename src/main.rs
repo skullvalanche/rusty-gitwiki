@@ -13,7 +13,7 @@ use axum::{
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 use std::path::PathBuf;
-use wiki_server::{AppState, UserRole};
+use rusty_gitwiki::{AppState, UserRole};
 use tracing_subscriber;
 
 struct Config {
@@ -133,7 +133,7 @@ fn parse_port(value: &str) -> anyhow::Result<u16> {
 
 fn print_usage() {
     println!(
-        "Usage: wiki-server [--data-dir PATH] [--port PORT]\n\n\
+        "Usage: rusty-gitwiki [--data-dir PATH] [--port PORT]\n\n\
 Options:\n  \
 --data-dir PATH  Wiki data directory (default: ./wiki_data or WIKI_DATA_DIR)\n  \
 --port PORT      HTTP port (default: 3000 or WIKI_PORT)\n  \

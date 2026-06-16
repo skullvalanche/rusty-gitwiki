@@ -1,6 +1,6 @@
-# Wiki Server
+# Rusty Gitwiki
 
-A simple, git-backed wiki server for small teams. Single binary, markdown storage, built in Rust.
+A simple, git-backed wiki server for small teams. Bundled release archives, markdown storage, built in Rust.
 
 ## Features
 
@@ -11,7 +11,7 @@ A simple, git-backed wiki server for small teams. Single binary, markdown storag
 - Admin user management with admin/editor/reader roles
 - Full-text search with a generated Tantivy index
 - Dark mode
-- Single binary runtime
+- Binary plus bundled static assets
 
 ## Quick Start
 
@@ -24,7 +24,7 @@ cargo build --release
 ### Run
 
 ```bash
-./target/release/wiki-server --port 3000 --data-dir /var/wiki
+./target/release/rusty-gitwiki --port 3000 --data-dir /var/wiki
 ```
 
 First run creates a default admin user: `admin` / `admin`. Change that password immediately.
@@ -69,9 +69,20 @@ Environment variable fallbacks:
 
 All routes require HTTP Basic Auth.
 
+## Release Builds
+
+GitHub Actions publishes release archives when you push a version tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Each release includes platform-specific archives with the `rusty-gitwiki` binary, `static/`, `README.md`, and `LICENSE`. Run the binary from the extracted archive so the server can find the bundled `static/` directory.
+
 ## Production
 
-Run Wiki Server behind a reverse proxy that handles TLS, public routing, request limits, and network exposure. Bind the app to an internal interface or private network port, and keep the wiki data directory on persistent storage.
+Run Rusty Gitwiki behind a reverse proxy that handles TLS, public routing, request limits, and network exposure. Bind the app to an internal interface or private network port, and keep the wiki data directory on persistent storage.
 
 ## License
 

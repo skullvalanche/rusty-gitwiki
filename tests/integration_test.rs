@@ -51,32 +51,32 @@ fn test_full_wiki_workflow() {
     // 1. Write a page
     let page_path = "test_page";
     let content = "# Test Page\n\nThis is a test.";
-    wiki_server_integration::write_page(&wiki_dir, page_path, content, "alice").unwrap();
+    rusty_gitwiki_integration::write_page(&wiki_dir, page_path, content, "alice").unwrap();
 
     // 2. Verify page exists and can be read
-    let read_content = wiki_server_integration::read_page(&wiki_dir, page_path).unwrap();
+    let read_content = rusty_gitwiki_integration::read_page(&wiki_dir, page_path).unwrap();
     assert_eq!(read_content, content);
 
     // 3. Write another page with hierarchy
     let nested_path = "docs/guide/intro";
     let nested_content = "# Introduction\n\nNested content.";
-    wiki_server_integration::write_page(&wiki_dir, nested_path, nested_content, "bob").unwrap();
+    rusty_gitwiki_integration::write_page(&wiki_dir, nested_path, nested_content, "bob").unwrap();
 
     // 4. List all pages
-    let pages = wiki_server_integration::list_pages(&wiki_dir).unwrap();
+    let pages = rusty_gitwiki_integration::list_pages(&wiki_dir).unwrap();
     assert!(pages.iter().any(|p| p.path == page_path));
     assert!(pages.iter().any(|p| p.path == nested_path));
     assert_eq!(pages.len(), 2);
 
     // 5. Update a page
     let updated_content = "# Test Page\n\nUpdated content.";
-    wiki_server_integration::write_page(&wiki_dir, page_path, updated_content, "alice").unwrap();
+    rusty_gitwiki_integration::write_page(&wiki_dir, page_path, updated_content, "alice").unwrap();
 
-    let updated_read = wiki_server_integration::read_page(&wiki_dir, page_path).unwrap();
+    let updated_read = rusty_gitwiki_integration::read_page(&wiki_dir, page_path).unwrap();
     assert_eq!(updated_read, updated_content);
 
     // 6. Verify page still exists in list
-    let final_pages = wiki_server_integration::list_pages(&wiki_dir).unwrap();
+    let final_pages = rusty_gitwiki_integration::list_pages(&wiki_dir).unwrap();
     assert_eq!(final_pages.len(), 2);
 }
 
@@ -89,68 +89,68 @@ fn test_user_creation_and_auth() {
     // 1. Create a user
     let username = "testuser";
     let password = "securepass123";
-    let user = wiki_server_integration::create_user(
+    let user = rusty_gitwiki_integration::create_user(
         &users_file,
         username,
         password,
-        wiki_server::UserRole::Editor,
+        rusty_gitwiki::UserRole::Editor,
     ).unwrap();
 
     assert_eq!(user.username, username);
-    assert!(matches!(user.role, wiki_server::UserRole::Editor));
+    assert!(matches!(user.role, rusty_gitwiki::UserRole::Editor));
 
     // 2. Find the user
-    let found = wiki_server_integration::find_user(&users_file, username).unwrap();
+    let found = rusty_gitwiki_integration::find_user(&users_file, username).unwrap();
     assert!(found.is_some());
     let found_user = found.unwrap();
     assert_eq!(found_user.username, username);
-    assert!(matches!(found_user.role, wiki_server::UserRole::Editor));
+    assert!(matches!(found_user.role, rusty_gitwiki::UserRole::Editor));
 
     // 3. Verify password
-    let is_valid = wiki_server_integration::verify_password(password, &found_user.password_hash).unwrap();
+    let is_valid = rusty_gitwiki_integration::verify_password(password, &found_user.password_hash).unwrap();
     assert!(is_valid);
 
-    let is_invalid = wiki_server_integration::verify_password("wrongpass", &found_user.password_hash).unwrap();
+    let is_invalid = rusty_gitwiki_integration::verify_password("wrongpass", &found_user.password_hash).unwrap();
     assert!(!is_invalid);
 
     // 4. Create admin user
-    let admin_user = wiki_server_integration::create_user(
+    let admin_user = rusty_gitwiki_integration::create_user(
         &users_file,
         "admin",
         "adminpass",
-        wiki_server::UserRole::Admin,
+        rusty_gitwiki::UserRole::Admin,
     ).unwrap();
 
-    assert!(matches!(admin_user.role, wiki_server::UserRole::Admin));
+    assert!(matches!(admin_user.role, rusty_gitwiki::UserRole::Admin));
 
     // 5. List both users
-    let users = wiki_server_integration::load_users(&users_file).unwrap();
+    let users = rusty_gitwiki_integration::load_users(&users_file).unwrap();
     assert_eq!(users.len(), 2);
-    assert!(users.iter().any(|u| u.username == username && matches!(u.role, wiki_server::UserRole::Editor)));
-    assert!(users.iter().any(|u| u.username == "admin" && matches!(u.role, wiki_server::UserRole::Admin)));
+    assert!(users.iter().any(|u| u.username == username && matches!(u.role, rusty_gitwiki::UserRole::Editor)));
+    assert!(users.iter().any(|u| u.username == "admin" && matches!(u.role, rusty_gitwiki::UserRole::Admin)));
 
     // 6. Change password
     let new_password = "newpass456";
-    wiki_server_integration::set_user_password(&users_file, username, new_password).unwrap();
+    rusty_gitwiki_integration::set_user_password(&users_file, username, new_password).unwrap();
 
-    let updated_user = wiki_server_integration::find_user(&users_file, username).unwrap().unwrap();
-    assert!(wiki_server_integration::verify_password(new_password, &updated_user.password_hash).unwrap());
-    assert!(!wiki_server_integration::verify_password(password, &updated_user.password_hash).unwrap());
+    let updated_user = rusty_gitwiki_integration::find_user(&users_file, username).unwrap().unwrap();
+    assert!(rusty_gitwiki_integration::verify_password(new_password, &updated_user.password_hash).unwrap());
+    assert!(!rusty_gitwiki_integration::verify_password(password, &updated_user.password_hash).unwrap());
 
     // 7. Delete user
-    wiki_server_integration::delete_user(&users_file, username).unwrap();
+    rusty_gitwiki_integration::delete_user(&users_file, username).unwrap();
 
-    let deleted = wiki_server_integration::find_user(&users_file, username).unwrap();
+    let deleted = rusty_gitwiki_integration::find_user(&users_file, username).unwrap();
     assert!(deleted.is_none());
 
-    let remaining_users = wiki_server_integration::load_users(&users_file).unwrap();
+    let remaining_users = rusty_gitwiki_integration::load_users(&users_file).unwrap();
     assert_eq!(remaining_users.len(), 1);
     assert_eq!(remaining_users[0].username, "admin");
 }
 
 /// Helper module to expose internal functions for testing
-mod wiki_server_integration {
-    use wiki_server::{User, UserRole};
+mod rusty_gitwiki_integration {
+    use rusty_gitwiki::{User, UserRole};
     use std::path::Path;
     use chrono::Utc;
 
@@ -178,7 +178,7 @@ mod wiki_server_integration {
         std::fs::read_to_string(file_path).map_err(|e| anyhow::anyhow!(e))
     }
 
-    pub fn list_pages(wiki_dir: &Path) -> anyhow::Result<Vec<wiki_server::ListPageResponse>> {
+    pub fn list_pages(wiki_dir: &Path) -> anyhow::Result<Vec<rusty_gitwiki::ListPageResponse>> {
         let mut pages = Vec::new();
 
         for entry in walkdir::WalkDir::new(wiki_dir)
@@ -199,7 +199,7 @@ mod wiki_server_integration {
             let modified = metadata.modified()?;
             let modified_dt = chrono::DateTime::<Utc>::from(modified);
 
-            pages.push(wiki_server::ListPageResponse {
+            pages.push(rusty_gitwiki::ListPageResponse {
                 path: page_path.replace("\\", "/"),
                 title: path.file_stem().unwrap_or_default().to_string_lossy().to_string(),
                 updated_at: modified_dt,

@@ -1,4 +1,4 @@
-use wiki_server::{User, UserRole};
+use rusty_gitwiki::{User, UserRole};
 use std::path::Path;
 use chrono::Utc;
 
@@ -186,10 +186,10 @@ use axum::{
 use std::sync::Arc;
 
 pub async fn basic_auth_middleware(
-    State(state): State<Arc<wiki_server::AppState>>,
+    State(state): State<Arc<rusty_gitwiki::AppState>>,
     req: Request<axum::body::Body>,
     next: Next,
-) -> Result<Response, wiki_server::WikiError> {
+) -> Result<Response, rusty_gitwiki::WikiError> {
     let auth_header = req.headers()
         .get("authorization")
         .and_then(|h| h.to_str().ok());
@@ -216,7 +216,7 @@ pub async fn basic_auth_middleware(
     }
 
     // No valid auth, return 401
-    Err(wiki_server::WikiError::Unauthorized)
+    Err(rusty_gitwiki::WikiError::Unauthorized)
 }
 
 fn base64_decode(s: &str) -> Result<String, anyhow::Error> {

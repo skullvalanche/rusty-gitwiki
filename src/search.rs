@@ -6,7 +6,7 @@ use tantivy::{
     schema::{Field, Schema, Value, STORED, TEXT},
     Index, TantivyDocument,
 };
-use wiki_server::SearchResult;
+use rusty_gitwiki::SearchResult;
 
 const INDEX_DIR: &str = ".search-index";
 const RESULT_LIMIT: usize = 25;

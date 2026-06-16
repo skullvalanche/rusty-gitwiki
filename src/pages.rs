@@ -1,4 +1,4 @@
-use wiki_server::{ArchivedPageResponse, ListPageResponse};
+use rusty_gitwiki::{ArchivedPageResponse, ListPageResponse};
 use std::path::{Component, Path, PathBuf};
 use chrono::Utc;
 use crate::git;
