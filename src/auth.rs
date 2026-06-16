@@ -1,4 +1,4 @@
-use wiki_server::User;
+use wiki_server::{User, UserRole};
 use std::path::Path;
 use chrono::Utc;
 
@@ -30,15 +30,11 @@ pub fn find_user(users_file: &Path, username: &str) -> anyhow::Result<Option<Use
     Ok(users.into_iter().find(|u| u.username == username))
 }
 
-pub fn user_exists(users_file: &Path, username: &str) -> anyhow::Result<bool> {
-    find_user(users_file, username).map(|u| u.is_some())
-}
-
 pub fn create_user(
     users_file: &Path,
     username: &str,
     password: &str,
-    is_admin: bool,
+    role: UserRole,
 ) -> anyhow::Result<User> {
     let mut users = load_users(users_file)?;
 
@@ -50,13 +46,33 @@ pub fn create_user(
     let user = User {
         username: username.to_string(),
         password_hash,
-        is_admin,
+        role,
         created_at: Utc::now(),
+        name: "".to_string(),
+        email: "".to_string(),
+        description: "".to_string(),
     };
 
     users.push(user.clone());
     save_users(users_file, users)?;
     Ok(user)
+}
+
+pub fn set_user_role(
+    users_file: &Path,
+    username: &str,
+    role: UserRole,
+) -> anyhow::Result<User> {
+    let mut users = load_users(users_file)?;
+
+    let user = users.iter_mut().find(|u| u.username == username)
+        .ok_or_else(|| anyhow::anyhow!("User not found"))?;
+
+    user.role = role;
+
+    let cloned = user.clone();
+    save_users(users_file, users)?;
+    Ok(cloned)
 }
 
 pub fn delete_user(users_file: &Path, username: &str) -> anyhow::Result<()> {
@@ -81,6 +97,26 @@ pub fn set_user_password(
     Ok(())
 }
 
+pub fn update_user_profile(
+    users_file: &Path,
+    username: &str,
+    name: &str,
+    email: &str,
+    description: &str,
+) -> anyhow::Result<User> {
+    let mut users = load_users(users_file)?;
+    let user = users.iter_mut().find(|u| u.username == username)
+        .ok_or_else(|| anyhow::anyhow!("User not found"))?;
+
+    user.name = name.to_string();
+    user.email = email.to_string();
+    user.description = description.to_string();
+
+    let cloned = user.clone();
+    save_users(users_file, users)?;
+    Ok(cloned)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,8 +139,11 @@ mod tests {
         let user = User {
             username: "admin".to_string(),
             password_hash: hash_password("admin").unwrap(),
-            is_admin: true,
+            role: UserRole::Admin,
             created_at: Utc::now(),
+            name: "".to_string(),
+            email: "".to_string(),
+            description: "".to_string(),
         };
 
         save_users(&users_file, vec![user.clone()]).unwrap();
@@ -124,8 +163,11 @@ mod tests {
         let user = User {
             username: "testuser".to_string(),
             password_hash: hash_password("pass").unwrap(),
-            is_admin: false,
+            role: UserRole::Editor,
             created_at: Utc::now(),
+            name: "".to_string(),
+            email: "".to_string(),
+            description: "".to_string(),
         };
         save_users(&users_file, vec![user]).unwrap();
 
@@ -163,7 +205,7 @@ pub async fn basic_auth_middleware(
                             let mut req = req;
                             req.extensions_mut().insert(CurrentUser {
                                 username: username.to_string(),
-                                is_admin: user.is_admin,
+                                role: user.role,
                             });
                             return Ok(next.run(req).await);
                         }
@@ -187,5 +229,15 @@ fn base64_decode(s: &str) -> Result<String, anyhow::Error> {
 #[derive(Debug, Clone)]
 pub struct CurrentUser {
     pub username: String,
-    pub is_admin: bool,
+    pub role: UserRole,
+}
+
+impl CurrentUser {
+    pub fn is_admin(&self) -> bool {
+        self.role.is_admin()
+    }
+
+    pub fn can_edit(&self) -> bool {
+        self.role.can_edit()
+    }
 }

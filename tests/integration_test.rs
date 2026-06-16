@@ -93,18 +93,18 @@ fn test_user_creation_and_auth() {
         &users_file,
         username,
         password,
-        false,
+        wiki_server::UserRole::Editor,
     ).unwrap();
 
     assert_eq!(user.username, username);
-    assert!(!user.is_admin);
+    assert!(matches!(user.role, wiki_server::UserRole::Editor));
 
     // 2. Find the user
     let found = wiki_server_integration::find_user(&users_file, username).unwrap();
     assert!(found.is_some());
     let found_user = found.unwrap();
     assert_eq!(found_user.username, username);
-    assert!(!found_user.is_admin);
+    assert!(matches!(found_user.role, wiki_server::UserRole::Editor));
 
     // 3. Verify password
     let is_valid = wiki_server_integration::verify_password(password, &found_user.password_hash).unwrap();
@@ -118,16 +118,16 @@ fn test_user_creation_and_auth() {
         &users_file,
         "admin",
         "adminpass",
-        true,
+        wiki_server::UserRole::Admin,
     ).unwrap();
 
-    assert!(admin_user.is_admin);
+    assert!(matches!(admin_user.role, wiki_server::UserRole::Admin));
 
     // 5. List both users
     let users = wiki_server_integration::load_users(&users_file).unwrap();
     assert_eq!(users.len(), 2);
-    assert!(users.iter().any(|u| u.username == username && !u.is_admin));
-    assert!(users.iter().any(|u| u.username == "admin" && u.is_admin));
+    assert!(users.iter().any(|u| u.username == username && matches!(u.role, wiki_server::UserRole::Editor)));
+    assert!(users.iter().any(|u| u.username == "admin" && matches!(u.role, wiki_server::UserRole::Admin)));
 
     // 6. Change password
     let new_password = "newpass456";
@@ -150,7 +150,7 @@ fn test_user_creation_and_auth() {
 
 /// Helper module to expose internal functions for testing
 mod wiki_server_integration {
-    use wiki_server::User;
+    use wiki_server::{User, UserRole};
     use std::path::Path;
     use chrono::Utc;
 
@@ -287,7 +287,7 @@ mod wiki_server_integration {
         users_file: &Path,
         username: &str,
         password: &str,
-        is_admin: bool,
+        role: UserRole,
     ) -> anyhow::Result<User> {
         let mut users = load_users(users_file)?;
 
@@ -299,8 +299,11 @@ mod wiki_server_integration {
         let user = User {
             username: username.to_string(),
             password_hash,
-            is_admin,
+            role,
             created_at: Utc::now(),
+            name: "".to_string(),
+            email: "".to_string(),
+            description: "".to_string(),
         };
 
         users.push(user.clone());

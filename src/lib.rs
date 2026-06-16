@@ -3,11 +3,60 @@ use chrono::{DateTime, Utc};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum UserRole {
+    Admin,
+    Editor,
+    Reader,
+}
+
+impl UserRole {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            UserRole::Admin => "admin",
+            UserRole::Editor => "editor",
+            UserRole::Reader => "reader",
+        }
+    }
+
+    pub fn can_edit(&self) -> bool {
+        matches!(self, UserRole::Admin | UserRole::Editor)
+    }
+
+    pub fn is_admin(&self) -> bool {
+        matches!(self, UserRole::Admin)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub username: String,
     pub password_hash: String,
-    pub is_admin: bool,
+    pub role: UserRole,
     pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub email: String,
+    #[serde(default)]
+    pub description: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserProfileResponse {
+    pub username: String,
+    pub name: String,
+    pub email: String,
+    pub description: String,
+    pub role: UserRole,
+    pub can_edit: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UserProfileUpdateRequest {
+    pub name: String,
+    pub email: String,
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,7 +85,8 @@ pub struct ConflictResolution {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PageResponse {
     pub path: String,
-    pub content: String,
+    pub content: String,       // rendered HTML
+    pub raw: String,           // original markdown for editing
     pub history: Vec<CommitInfo>,
     pub current_git_head: String,
 }
@@ -68,6 +118,12 @@ pub struct ListPageResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ArchivedPageResponse {
+    pub path: String,
+    pub archived_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SearchResult {
     pub path: String,
     pub excerpt: String,
@@ -77,13 +133,29 @@ pub struct SearchResult {
 pub struct UserCreateRequest {
     pub username: String,
     pub password: String,
-    pub is_admin: bool,
+    pub role: UserRole,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserCreateResponse {
     pub username: String,
     pub created_at: DateTime<Utc>,
+    pub role: UserRole,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserAdminResponse {
+    pub username: String,
+    pub role: UserRole,
+    pub created_at: DateTime<Utc>,
+    pub name: String,
+    pub email: String,
+    pub description: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserRoleSetRequest {
+    pub role: UserRole,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

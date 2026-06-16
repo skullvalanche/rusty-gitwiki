@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use anyhow::anyhow;
 
 pub fn git_commit(
@@ -23,6 +23,51 @@ pub fn git_commit(
     }
 
     // Commit
+    let status = std::process::Command::new("git")
+        .args(&["commit", "-m", message, "--author", &format!("{} <{}>", author, author)])
+        .current_dir(repo_dir)
+        .output()?;
+
+    if !status.status.success() {
+        let stderr = String::from_utf8_lossy(&status.stderr);
+        return Err(anyhow!("git commit failed: {}", stderr));
+    }
+
+    get_current_head(repo_dir)
+}
+
+pub fn git_rename(
+    repo_dir: &Path,
+    old_file_path: &Path,
+    new_file_path: &Path,
+    message: &str,
+    author: &str,
+) -> anyhow::Result<String> {
+    let old_relative_path = old_file_path
+        .strip_prefix(repo_dir)
+        .unwrap_or(old_file_path);
+    let new_relative_path = new_file_path
+        .strip_prefix(repo_dir)
+        .unwrap_or(new_file_path);
+
+    let status = std::process::Command::new("git")
+        .args(&["mv", old_relative_path.to_str().unwrap(), new_relative_path.to_str().unwrap()])
+        .current_dir(repo_dir)
+        .output()?;
+
+    if !status.status.success() {
+        let stderr = String::from_utf8_lossy(&status.stderr);
+        return Err(anyhow!("git mv failed: {}", stderr));
+    }
+
+    git_commit_staged(repo_dir, message, author)
+}
+
+fn git_commit_staged(
+    repo_dir: &Path,
+    message: &str,
+    author: &str,
+) -> anyhow::Result<String> {
     let status = std::process::Command::new("git")
         .args(&["commit", "-m", message, "--author", &format!("{} <{}>", author, author)])
         .current_dir(repo_dir)
@@ -70,56 +115,19 @@ pub fn file_changed_since_head(
     Ok(!status.trim().is_empty())
 }
 
-pub fn git_merge(
-    repo_dir: &Path,
-    file_path: &Path,
-    branch_name: &str,
-) -> anyhow::Result<GitMergeResult> {
-    let output = std::process::Command::new("git")
-        .args(&["merge", branch_name])
-        .current_dir(repo_dir)
-        .output()?;
-
-    if output.status.success() {
-        return Ok(GitMergeResult::Success {
-            commit_hash: get_current_head(repo_dir)?,
-        });
-    }
-
-    // Check for conflicts
-    let status_output = std::process::Command::new("git")
-        .args(&["status", "--porcelain"])
-        .current_dir(repo_dir)
-        .output()?;
-
-    let status_str = String::from_utf8_lossy(&status_output.stdout);
-    if status_str.contains("UU") || status_str.contains("AA") || status_str.contains("UD") {
-        let file_content = std::fs::read_to_string(file_path)?;
-        return Ok(GitMergeResult::Conflict {
-            conflicted_content: file_content,
-        });
-    }
-
-    Err(anyhow!("git merge failed with unknown error"))
-}
-
-pub enum GitMergeResult {
-    Success { commit_hash: String },
-    Conflict { conflicted_content: String },
-}
-
 pub fn get_git_log(
     repo_dir: &Path,
     file_path: &Path,
     limit: usize,
 ) -> anyhow::Result<Vec<(String, String, String)>> {
+    let relative = file_path.strip_prefix(repo_dir).unwrap_or(file_path);
     let output = std::process::Command::new("git")
         .args(&[
             "log",
             &format!("--max-count={}", limit),
             "--format=%H|%an|%s",
             "--",
-            file_path.to_str().unwrap(),
+            relative.to_str().unwrap(),
         ])
         .current_dir(repo_dir)
         .output()?;
@@ -148,11 +156,49 @@ pub fn get_git_log(
     Ok(commits)
 }
 
+pub fn get_diff_to_current(
+    repo_dir: &Path,
+    file_path: &Path,
+    commit_hash: &str,
+) -> anyhow::Result<String> {
+    let relative = file_path.strip_prefix(repo_dir).unwrap_or(file_path);
+    let output = std::process::Command::new("git")
+        .args(&[
+            "diff",
+            commit_hash,
+            "HEAD",
+            "--",
+            relative.to_str().unwrap(),
+        ])
+        .current_dir(repo_dir)
+        .output()?;
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+pub fn get_file_at_commit(
+    repo_dir: &Path,
+    file_path: &Path,
+    commit_hash: &str,
+) -> anyhow::Result<String> {
+    let relative = file_path.strip_prefix(repo_dir).unwrap_or(file_path);
+    let output = std::process::Command::new("git")
+        .args(&["show", &format!("{}:{}", commit_hash, relative.to_str().unwrap())])
+        .current_dir(repo_dir)
+        .output()?;
+
+    if !output.status.success() {
+        return Err(anyhow!("git show failed for commit {}", commit_hash));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn setup_test_repo() -> PathBuf {
+    fn setup_test_repo() -> std::path::PathBuf {
         use std::time::{SystemTime, UNIX_EPOCH};
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)

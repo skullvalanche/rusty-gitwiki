@@ -4,25 +4,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wiki</title>
+    <script>
+        document.documentElement.dataset.theme = localStorage.getItem('wiki-theme') || 'light';
+    </script>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <div id="app" class="container">
         <div class="sidebar">
             <h2>Wiki</h2>
-            <input type="text" id="search-input" placeholder="Search pages...">
-            <div id="page-list"></div>
+            <div class="search-row">
+                <input type="text" id="search-input" placeholder="Search pages..." aria-label="Search pages">
+                <button type="button" id="search-clear-btn" aria-label="Clear search" title="Clear search">×</button>
+            </div>
+            <nav id="page-list" aria-label="Pages"></nav>
             <button id="new-page-btn">+ New Page</button>
+            <div class="user-profile-section">
+                <div id="sidebar-username"></div>
+                <div id="sidebar-email"></div>
+                <button id="profile-btn">Profile</button>
+                <button id="user-management-btn" style="display: none;">Users</button>
+                <button id="archived-pages-btn" style="display: none;">Archived Pages</button>
+                <label class="theme-toggle">
+                    <input type="checkbox" id="theme-toggle">
+                    <span>Dark Mode</span>
+                </label>
+                <button id="logout-btn">Logout</button>
+            </div>
         </div>
         <div class="main">
             <div id="editor" style="display: none;">
                 <div class="editor-header">
                     <input type="text" id="page-path-input" placeholder="Page path (e.g., docs/guide)">
                     <button id="save-btn">Save</button>
+                    <button id="rename-btn" class="secondary-btn">Rename</button>
+                    <button id="archive-btn" class="danger-action-btn">Archive</button>
+                    <button id="cancel-btn" class="secondary-btn">Cancel</button>
+                </div>
+                <div class="editor-toolbar">
+                    <button type="button" class="toolbar-btn" data-action="bold" title="Bold" aria-label="Bold"><b>B</b></button>
+                    <button type="button" class="toolbar-btn" data-action="italic" title="Italic" aria-label="Italic"><i>I</i></button>
+                    <button type="button" class="toolbar-btn" data-action="heading" title="Heading" aria-label="Heading">H2</button>
+                    <button type="button" class="toolbar-btn" data-action="code" title="Code" aria-label="Code">Code</button>
+                    <button type="button" class="toolbar-btn" data-action="wiki-link" title="Wiki link" aria-label="Wiki link">Wiki</button>
+                    <select id="wiki-markup-select" class="toolbar-select" title="Insert wiki markup" aria-label="Insert wiki markup">
+                        <option value="">Insert...</option>
+                        <option value="wiki-link">Page link</option>
+                        <option value="wiki-alias-link">Labeled page link</option>
+                        <option value="children">Sub-pages</option>
+                        <option value="children-prefix">Sub-pages under path</option>
+                        <option value="tree">Page tree</option>
+                        <option value="tree-prefix">Page tree under path</option>
+                        <option value="toc">Table of contents</option>
+                        <option value="toc-range">TOC heading range</option>
+                    </select>
+                    <button type="button" class="toolbar-btn" data-action="link" title="Link" aria-label="Link">Link</button>
                 </div>
                 <div class="editor-container">
-                    <textarea id="content-input"></textarea>
-                    <div id="preview" class="preview"></div>
+                    <div class="editor-pane">
+                        <div class="pane-label">Markdown</div>
+                        <textarea id="content-input"></textarea>
+                    </div>
+                    <div class="preview-pane">
+                        <div class="pane-label">Preview</div>
+                        <div id="preview" class="preview"></div>
+                    </div>
                 </div>
                 <div id="conflict-ui" style="display: none;">
                     <h3>Merge Conflict</h3>
@@ -47,8 +93,99 @@
                 </div>
                 <div id="page-content" class="content"></div>
                 <div id="history" class="history">
-                    <h3>History</h3>
-                    <div id="history-list"></div>
+                    <button type="button" id="history-toggle" class="history-toggle" aria-expanded="false">▶ History</button>
+                    <div id="history-list" style="display: none;"></div>
+                </div>
+            </div>
+            <div id="version-viewer" style="display: none;">
+                <div class="version-header">
+                    <span id="version-label"></span>
+                    <button id="restore-btn">Restore this version</button>
+                    <button id="version-close-btn" class="secondary-btn">Close</button>
+                </div>
+                <div class="version-panes">
+                    <div class="version-pane">
+                        <div class="version-pane-title">This version</div>
+                        <div id="version-content" class="content"></div>
+                    </div>
+                    <div class="version-pane">
+                        <div class="version-pane-title">Changes since this version</div>
+                        <pre id="version-diff" class="diff-view"></pre>
+                    </div>
+                </div>
+            </div>
+            <div id="profile-viewer" style="display: none;">
+                <div class="profile-header">
+                    <h1>User Profile</h1>
+                </div>
+                <div class="profile-content">
+                    <div class="form-group">
+                        <label for="profile-username">Username</label>
+                        <input type="text" id="profile-username" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-name">Name</label>
+                        <input type="text" id="profile-name" placeholder="Name">
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-email">Email</label>
+                        <input type="email" id="profile-email" placeholder="Email">
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-description">Description</label>
+                        <textarea id="profile-description" placeholder="Description"></textarea>
+                    </div>
+                    <div class="profile-buttons">
+                        <button id="profile-save-btn">Save Profile</button>
+                        <button id="profile-cancel-btn" class="secondary-btn">Cancel</button>
+                    </div>
+                </div>
+            </div>
+            <div id="archive-viewer" style="display: none;">
+                <div class="profile-header">
+                    <h1>Archived Pages</h1>
+                </div>
+                <div class="profile-content">
+                    <div id="archive-list" class="archive-list"></div>
+                </div>
+            </div>
+            <div id="user-management-viewer" style="display: none;">
+                <div class="profile-header">
+                    <h1>User Management</h1>
+                </div>
+                <div class="profile-content admin-content">
+                    <form id="create-user-form" class="admin-panel">
+                        <h2>Create User</h2>
+                        <div class="admin-form-grid">
+                            <div class="form-group">
+                                <label for="new-user-username">Username</label>
+                                <input type="text" id="new-user-username" autocomplete="off" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="new-user-password">Password</label>
+                                <input type="password" id="new-user-password" autocomplete="new-password" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="new-user-role">Role</label>
+                                <select id="new-user-role">
+                                    <option value="editor">Editor</option>
+                                    <option value="reader">Reader</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                            <button type="submit" id="create-user-btn" class="primary-action-btn">Create User</button>
+                        </div>
+                    </form>
+                    <div class="admin-panel">
+                        <div class="admin-list-header">
+                            <h2>Users</h2>
+                            <div class="admin-list-header-actions">
+                                <button type="button" id="reindex-search-btn" class="secondary-btn">Reindex Search</button>
+                                <button type="button" id="refresh-users-btn" class="secondary-btn">Refresh</button>
+                            </div>
+                        </div>
+                        <div id="user-management-list" class="admin-list"></div>
+                    </div>
                 </div>
             </div>
             <div id="welcome" style="display: block;">
@@ -57,6 +194,16 @@
             </div>
         </div>
     </div>
+    <div id="login-modal" style="display: none;">
+        <div class="login-box">
+            <h2>Wiki Login</h2>
+            <input type="text" id="login-username" placeholder="Username" autocomplete="username">
+            <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+            <button id="login-btn">Login</button>
+            <p id="login-error" style="color: red; display: none;"></p>
+        </div>
+    </div>
+    <div id="toast" role="status" aria-live="polite"></div>
     <script src="/app.js"></script>
 </body>
 </html>

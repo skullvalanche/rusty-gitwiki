@@ -8,9 +8,10 @@ A simple, git-backed wiki server for small teams. Single binary, markdown storag
 - Git version control and history
 - Conflict resolution UI for concurrent edits
 - Basic HTTP auth
-- Admin user management
-- Full-text search
-- Single binary deployment
+- Admin user management with admin/editor/reader roles
+- Full-text search with a generated Tantivy index
+- Dark mode
+- Single binary runtime
 
 ## Quick Start
 
@@ -23,10 +24,10 @@ cargo build --release
 ### Run
 
 ```bash
-WIKI_PORT=3000 WIKI_DATA_DIR=/var/wiki ./target/release/wiki-server
+./target/release/wiki-server --port 3000 --data-dir /var/wiki
 ```
 
-First run: you'll be prompted to create an admin user.
+First run creates a default admin user: `admin` / `admin`. Change that password immediately.
 
 ### Access
 
@@ -34,8 +35,15 @@ Open http://localhost:3000 in your browser.
 
 ## Configuration
 
-- `WIKI_PORT` — HTTP port (default: 3000)
-- `WIKI_DATA_DIR` — Directory for wiki data + git repo (default: ./wiki_data)
+CLI flags:
+
+- `--port PORT` — HTTP port (default: 3000)
+- `--data-dir PATH` — Directory for wiki data + git repo (default: ./wiki_data)
+
+Environment variable fallbacks:
+
+- `WIKI_PORT`
+- `WIKI_DATA_DIR`
 
 ## API
 
@@ -52,65 +60,18 @@ Open http://localhost:3000 in your browser.
 
 ### Admin
 
+- `GET /api/admin/users` — List users
 - `POST /api/admin/users` — Create user
 - `DELETE /api/admin/users/:user` — Delete user
 - `PUT /api/admin/users/:user/password` — Set password
+- `PUT /api/admin/users/:user/role` — Set role
+- `POST /api/admin/search/reindex` — Rebuild the generated search index
 
 All routes require HTTP Basic Auth.
 
-## Deployment
+## Production
 
-### Systemd
-
-```ini
-[Unit]
-Description=Wiki Server
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/wiki-server
-Environment="WIKI_PORT=3000"
-Environment="WIKI_DATA_DIR=/var/wiki"
-Restart=on-failure
-User=wiki
-Group=wiki
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### Docker
-
-```bash
-docker build -t wiki-server .
-docker run -p 3000:3000 -v /path/to/wiki:/data wiki-server
-```
-
-## Architecture
-
-- **Backend**: Rust + Axum web framework
-- **Storage**: Markdown files in git repo
-- **Users**: JSON file with bcrypt-hashed passwords
-- **Frontend**: Vanilla JS SPA
-- **Git**: Subprocess integration (requires `git` CLI)
-
-## Conflict Resolution
-
-When two users edit the same page simultaneously:
-1. First user saves successfully
-2. Second user's save detects conflict
-3. UI shows both versions
-4. User selects sections to keep
-5. Conflict is resolved and committed
-
-## Future Enhancements
-
-- Full-text search (tantivy)
-- Drag-drop page reorganization
-- User roles (read-only vs read-write)
-- Rich markdown editor
-- Dark mode
+Run Wiki Server behind a reverse proxy that handles TLS, public routing, request limits, and network exposure. Bind the app to an internal interface or private network port, and keep the wiki data directory on persistent storage.
 
 ## License
 
